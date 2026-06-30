@@ -24,6 +24,7 @@ import {
   suggestMove,
 } from "../gameLogic";
 import type { GameScreenProps } from "../navigation";
+import { colors, radii, spacing, typography } from "../theme";
 
 /**
  * The Game screen.
@@ -79,24 +80,16 @@ export function GameScreen({
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>Total</Text>
-            <Text style={styles.statValue}>{state.currentTotal}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>Target</Text>
-            <Text style={styles.statValue}>{config.target}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>Remaining</Text>
-            <Text style={styles.statValue}>{Math.max(distance, 0)}</Text>
-          </View>
-        </View>
+        <StatsRow
+          currentTotal={state.currentTotal}
+          target={config.target}
+          remaining={Math.max(distance, 0)}
+        />
 
         <Text style={styles.conditionHint}>
-          Reaching the target {config.hittingTargetMeans === "WIN" ? "WINS" : "LOSES"}
-          {" "}· moves {config.min}–{config.max}
+          Reaching the target{" "}
+          {config.hittingTargetMeans === "WIN" ? "wins" : "loses"} · moves{" "}
+          {config.min}–{config.max}
         </Text>
 
         {state.isGameOver ? (
@@ -125,6 +118,52 @@ export function GameScreen({
 }
 
 /**
+ * Top stat strip showing total / target / remaining.
+ *
+ * Args:
+ *   currentTotal (number): running total so far.
+ *   target (number): configured target number.
+ *   remaining (number): distance to target, floored at 0.
+ *
+ * Returns:
+ *   JSX.Element
+ */
+function StatsRow(props: {
+  currentTotal: number;
+  target: number;
+  remaining: number;
+}): React.ReactElement {
+  return (
+    <View style={styles.statsRow}>
+      <Stat label="Total" value={props.currentTotal} />
+      <View style={styles.statDivider} />
+      <Stat label="Target" value={props.target} />
+      <View style={styles.statDivider} />
+      <Stat label="Remaining" value={props.remaining} />
+    </View>
+  );
+}
+
+/**
+ * A single stat cell — small label above a numeric value.
+ *
+ * Args:
+ *   label (string): uppercase secondary label.
+ *   value (number): the numeric value to display.
+ *
+ * Returns:
+ *   JSX.Element
+ */
+function Stat(props: { label: string; value: number }): React.ReactElement {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{props.label}</Text>
+      <Text style={styles.statValue}>{props.value}</Text>
+    </View>
+  );
+}
+
+/**
  * Panel shown when it's the app user's turn — the suggested move is huge.
  *
  * Args:
@@ -139,15 +178,16 @@ function AppUserTurnPanel(props: {
   onConfirm: () => void;
 }): React.ReactElement {
   return (
-    <View style={styles.turnPanel}>
+    <View style={styles.userTurnPanel}>
       <Text style={styles.turnLabel}>Your turn — pick</Text>
       <Text style={styles.suggestedNumber}>{props.suggested}</Text>
       <TouchableOpacity
-        style={styles.confirmButton}
+        style={styles.primaryButton}
         onPress={props.onConfirm}
         accessibilityRole="button"
+        activeOpacity={0.85}
       >
-        <Text style={styles.confirmButtonText}>I made this move</Text>
+        <Text style={styles.primaryButtonText}>I picked this</Text>
       </TouchableOpacity>
     </View>
   );
@@ -173,8 +213,9 @@ function OpponentTurnPanel(props: {
   const values: number[] = [];
   for (let k = props.min; k <= props.max; k++) values.push(k);
   return (
-    <View style={styles.turnPanel}>
-      <Text style={styles.turnLabel}>Opponent&apos;s turn — what did they pick?</Text>
+    <View style={styles.opponentTurnPanel}>
+      <Text style={styles.turnLabel}>Opponent&apos;s turn</Text>
+      <Text style={styles.turnSubLabel}>What did they pick?</Text>
       <View style={styles.pickRow}>
         {values.map((v) => (
           <TouchableOpacity
@@ -182,6 +223,7 @@ function OpponentTurnPanel(props: {
             style={styles.pickButton}
             onPress={() => props.onPick(v)}
             accessibilityRole="button"
+            activeOpacity={0.85}
           >
             <Text style={styles.pickButtonText}>{v}</Text>
           </TouchableOpacity>
@@ -208,21 +250,26 @@ function GameOverPanel(props: {
   onChangeSettings: () => void;
 }): React.ReactElement {
   return (
-    <View style={[styles.turnPanel, props.won ? styles.wonBg : styles.lostBg]}>
-      <Text style={styles.resultText}>
-        {props.won ? "You won!" : "You lost."}
+    <View style={styles.resultPanel}>
+      <Text style={styles.resultLabel}>
+        {props.won ? "You won" : "You lost"}
+      </Text>
+      <Text style={styles.resultSubLabel}>
+        {props.won ? "Nice play." : "Better luck next round."}
       </Text>
       <TouchableOpacity
-        style={styles.confirmButton}
+        style={[styles.primaryButton, styles.resultPrimaryButton]}
         onPress={props.onPlayAgain}
         accessibilityRole="button"
+        activeOpacity={0.85}
       >
-        <Text style={styles.confirmButtonText}>Play again (same setup)</Text>
+        <Text style={styles.primaryButtonText}>Play again</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.secondaryButton}
         onPress={props.onChangeSettings}
         accessibilityRole="button"
+        activeOpacity={0.7}
       >
         <Text style={styles.secondaryButtonText}>Change settings</Text>
       </TouchableOpacity>
@@ -231,7 +278,8 @@ function GameOverPanel(props: {
 }
 
 /**
- * Scrolling list of every move made so far.
+ * Scrolling list of every move made so far, with a running total shown
+ * after each entry.
  *
  * Args:
  *   history (GameState["history"]): ordered move list.
@@ -242,118 +290,214 @@ function GameOverPanel(props: {
 function HistoryList(props: {
   history: GameState["history"];
 }): React.ReactElement {
-  if (props.history.length === 0) {
-    return (
-      <View style={styles.history}>
-        <Text style={styles.historyLabel}>History</Text>
-        <Text style={styles.historyEmpty}>No moves yet.</Text>
-      </View>
-    );
-  }
+  // Compute the running total after each move on the fly. Storing the running
+  // total in state would also work, but this keeps GameState a pure log of
+  // raw moves and avoids two ways to derive the same number.
+  let runningTotal = 0;
+  const rows = props.history.map((m, i) => {
+    runningTotal += m.amount;
+    return { ...m, runningTotal, index: i };
+  });
+
   return (
     <View style={styles.history}>
       <Text style={styles.historyLabel}>History</Text>
-      {props.history.map((m, i) => (
-        <Text key={i} style={styles.historyItem}>
-          {i + 1}. {m.player === "APP_USER" ? "You" : "Opponent"}: +{m.amount}
-        </Text>
-      ))}
+      {rows.length === 0 ? (
+        <Text style={styles.historyEmpty}>No moves yet.</Text>
+      ) : (
+        rows.map((m, i) => (
+          <View
+            key={m.index}
+            style={[
+              styles.historyRow,
+              i < rows.length - 1 && styles.historyRowDivider,
+            ]}
+          >
+            <Text style={styles.historyText}>
+              {m.player === "APP_USER" ? "You" : "Opponent"} picked{" "}
+              <Text style={styles.historyAmount}>{m.amount}</Text>{" "}
+              <Text style={styles.historyArrow}>→</Text> total:{" "}
+              <Text style={styles.historyAmount}>{m.runningTotal}</Text>
+            </Text>
+          </View>
+        ))
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
-  scroll: { padding: 20, paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: colors.background },
+  scroll: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+
   statsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
   },
   stat: { flex: 1, alignItems: "center" },
-  statLabel: { fontSize: 12, color: "#777", textTransform: "uppercase" },
-  statValue: { fontSize: 28, fontWeight: "700", color: "#111" },
+  statDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+    marginVertical: 4,
+  },
+  statLabel: {
+    ...typography.sectionLabel,
+    fontSize: 11,
+    marginBottom: spacing.xs,
+  },
+  statValue: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
   conditionHint: {
+    ...typography.helper,
     textAlign: "center",
-    color: "#555",
-    marginBottom: 24,
-    fontSize: 13,
+    marginBottom: spacing.xl,
   },
-  turnPanel: {
-    backgroundColor: "#f5f7fb",
-    borderRadius: 14,
-    padding: 24,
+
+  userTurnPanel: {
+    backgroundColor: colors.primaryTint,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
-  wonBg: { backgroundColor: "#dff5e1" },
-  lostBg: { backgroundColor: "#fde0e0" },
-  turnLabel: { fontSize: 16, color: "#444", marginBottom: 12 },
+  opponentTurnPanel: {
+    backgroundColor: colors.accentTint,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    alignItems: "center",
+    marginBottom: spacing.xl,
+  },
+  turnLabel: {
+    ...typography.sectionLabel,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  turnSubLabel: {
+    ...typography.helper,
+    marginBottom: spacing.lg,
+  },
   suggestedNumber: {
-    fontSize: 140,
+    fontSize: 160,
     fontWeight: "800",
-    color: "#0a84ff",
-    marginVertical: 8,
-    lineHeight: 150,
+    color: colors.primary,
+    lineHeight: 170,
+    letterSpacing: -4,
+    marginVertical: spacing.sm,
   },
-  confirmButton: {
-    backgroundColor: "#0a84ff",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    marginTop: 12,
-    alignSelf: "stretch",
-    alignItems: "center",
-  },
-  confirmButtonText: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: "#0a84ff",
+
+  primaryButton: {
+    backgroundColor: colors.primary,
     paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    marginTop: 10,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.md,
     alignSelf: "stretch",
     alignItems: "center",
+    marginTop: spacing.lg,
   },
-  secondaryButtonText: { color: "#0a84ff", fontSize: 16, fontWeight: "600" },
+  primaryButtonText: {
+    ...typography.buttonLabel,
+    color: colors.textInverse,
+  },
+  secondaryButton: {
+    paddingVertical: 14,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.md,
+    alignSelf: "stretch",
+    alignItems: "center",
+    marginTop: spacing.sm,
+    backgroundColor: "transparent",
+  },
+  secondaryButtonText: {
+    ...typography.buttonLabel,
+    color: colors.textSecondary,
+  },
+
   pickRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 12,
-    marginTop: 8,
+    gap: spacing.md,
+    marginTop: spacing.xs,
   },
   pickButton: {
-    minWidth: 64,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: "#0a84ff",
+    minWidth: 72,
+    paddingVertical: 18,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent,
     alignItems: "center",
   },
-  pickButtonText: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  resultText: {
+  pickButtonText: {
+    color: colors.textInverse,
+    fontSize: 26,
+    fontWeight: "700",
+  },
+
+  resultPanel: {
+    backgroundColor: colors.accentTint,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    alignItems: "center",
+    marginBottom: spacing.xl,
+  },
+  resultLabel: {
     fontSize: 36,
     fontWeight: "800",
-    color: "#111",
-    marginBottom: 8,
+    color: colors.text,
+    letterSpacing: -1,
+    marginBottom: spacing.xs,
   },
+  resultSubLabel: {
+    ...typography.helper,
+    marginBottom: spacing.sm,
+  },
+  resultPrimaryButton: { marginTop: spacing.lg },
+
   history: {
-    marginTop: 8,
-    padding: 16,
-    backgroundColor: "#fafafa",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
+    marginTop: spacing.sm,
   },
   historyLabel: {
-    fontSize: 13,
-    color: "#777",
-    textTransform: "uppercase",
-    marginBottom: 6,
+    ...typography.sectionLabel,
+    marginBottom: spacing.sm,
   },
-  historyEmpty: { color: "#999", fontStyle: "italic" },
-  historyItem: { fontSize: 15, color: "#222", paddingVertical: 2 },
+  historyEmpty: {
+    ...typography.helper,
+    fontStyle: "italic",
+    paddingVertical: spacing.sm,
+  },
+  historyRow: {
+    paddingVertical: spacing.sm,
+  },
+  historyRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  historyText: {
+    ...typography.body,
+    color: colors.text,
+  },
+  historyAmount: {
+    fontWeight: "700",
+    color: colors.text,
+  },
+  historyArrow: {
+    color: colors.textSecondary,
+  },
 });

@@ -24,6 +24,7 @@ import {
   validateConfig,
 } from "../gameLogic";
 import type { SettingsScreenProps } from "../navigation";
+import { colors, radii, spacing, typography } from "../theme";
 
 /**
  * Parse a numeric form input into an integer (or NaN if blank/garbage).
@@ -42,7 +43,8 @@ function parseIntegerInput(raw: string): number {
 }
 
 /**
- * A two-option segmented control built from plain TouchableOpacity buttons.
+ * A two-option segmented control rendered as a unified rounded track with a
+ * floating, blue-filled selected segment.
  *
  * Args:
  *   options ({ label, value }[]): the two choices.
@@ -58,7 +60,7 @@ function Segmented<T extends string>(props: {
   onChange: (v: T) => void;
 }): React.ReactElement {
   return (
-    <View style={styles.segmentRow}>
+    <View style={styles.segmentTrack}>
       {props.options.map((opt) => {
         const selected = opt.value === props.value;
         return (
@@ -68,6 +70,7 @@ function Segmented<T extends string>(props: {
             onPress={() => props.onChange(opt.value)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
+            activeOpacity={0.7}
           >
             <Text
               style={[
@@ -137,24 +140,28 @@ export function SettingsScreen({
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Counting Game Settings</Text>
+          <Text style={styles.title}>Counting game</Text>
+          <Text style={styles.subtitle}>
+            Configure the rules, then tap start to play.
+          </Text>
 
-          <View style={styles.field}>
+          <View style={styles.section}>
             <Text style={styles.label}>Target number</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.target && styles.inputError]}
               keyboardType="number-pad"
               value={targetRaw}
               onChangeText={setTargetRaw}
               placeholder="e.g. 21"
+              placeholderTextColor={colors.textSecondary}
             />
             {errors.target && (
               <Text style={styles.error}>{errors.target}</Text>
             )}
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Reaching the target…</Text>
+          <View style={styles.section}>
+            <Text style={styles.label}>Reaching the target</Text>
             <Segmented<TargetCondition>
               options={[
                 { label: "Wins", value: "WIN" },
@@ -165,37 +172,46 @@ export function SettingsScreen({
             />
           </View>
 
-          <View style={styles.row}>
-            <View style={[styles.field, styles.half]}>
-              <Text style={styles.label}>Minimum per turn</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="number-pad"
-                value={minRaw}
-                onChangeText={setMinRaw}
-                placeholder="1"
-              />
-              {errors.min && <Text style={styles.error}>{errors.min}</Text>}
-            </View>
-            <View style={[styles.field, styles.half]}>
-              <Text style={styles.label}>Maximum per turn</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="number-pad"
-                value={maxRaw}
-                onChangeText={setMaxRaw}
-                placeholder="3"
-              />
-              {errors.max && <Text style={styles.error}>{errors.max}</Text>}
+          <View style={styles.section}>
+            <Text style={styles.label}>Range per turn</Text>
+            <View style={styles.row}>
+              <View style={[styles.half]}>
+                <Text style={styles.subLabel}>Minimum</Text>
+                <TextInput
+                  style={[styles.input, errors.min && styles.inputError]}
+                  keyboardType="number-pad"
+                  value={minRaw}
+                  onChangeText={setMinRaw}
+                  placeholder="1"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                {errors.min && (
+                  <Text style={styles.error}>{errors.min}</Text>
+                )}
+              </View>
+              <View style={[styles.half]}>
+                <Text style={styles.subLabel}>Maximum</Text>
+                <TextInput
+                  style={[styles.input, errors.max && styles.inputError]}
+                  keyboardType="number-pad"
+                  value={maxRaw}
+                  onChangeText={setMaxRaw}
+                  placeholder="3"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                {errors.max && (
+                  <Text style={styles.error}>{errors.max}</Text>
+                )}
+              </View>
             </View>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Who goes first?</Text>
+          <View style={styles.section}>
+            <Text style={styles.label}>Who goes first</Text>
             <Segmented<Player>
               options={[
-                { label: "I go first", value: "APP_USER" },
-                { label: "Opponent first", value: "OPPONENT" },
+                { label: "I do", value: "APP_USER" },
+                { label: "Opponent", value: "OPPONENT" },
               ]}
               value={startingPlayer}
               onChange={setStartingPlayer}
@@ -206,6 +222,7 @@ export function SettingsScreen({
             style={styles.startButton}
             onPress={handleStart}
             accessibilityRole="button"
+            activeOpacity={0.85}
           >
             <Text style={styles.startButtonText}>Start game</Text>
           </TouchableOpacity>
@@ -216,57 +233,78 @@ export function SettingsScreen({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  scroll: { padding: 20, paddingBottom: 40 },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 24,
-    color: "#111",
+  scroll: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
-  field: { marginBottom: 20 },
+  title: {
+    ...typography.title,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    ...typography.helper,
+    marginBottom: spacing.xxl,
+  },
+  section: { marginBottom: spacing.xl },
   label: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
+    ...typography.sectionLabel,
+    marginBottom: spacing.md,
+  },
+  subLabel: {
+    ...typography.helper,
+    marginBottom: spacing.sm,
   },
   input: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 18,
-    backgroundColor: "#fafafa",
-    color: "#111",
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    fontSize: 17,
+    color: colors.text,
   },
-  row: { flexDirection: "row", gap: 12 },
+  inputError: { borderColor: colors.error },
+  row: { flexDirection: "row", gap: spacing.md },
   half: { flex: 1 },
-  segmentRow: {
+  segmentTrack: {
     flexDirection: "row",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    overflow: "hidden",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.lg,
+    padding: 4,
   },
   segment: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     alignItems: "center",
-    backgroundColor: "#fafafa",
+    borderRadius: radii.md,
+    backgroundColor: "transparent",
   },
-  segmentSelected: { backgroundColor: "#0a84ff" },
-  segmentLabel: { fontSize: 15, color: "#333", fontWeight: "500" },
-  segmentLabelSelected: { color: "#fff", fontWeight: "700" },
-  error: { color: "#d33", fontSize: 13, marginTop: 6 },
+  segmentSelected: { backgroundColor: colors.primary },
+  segmentLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+  segmentLabelSelected: { color: colors.textInverse, fontWeight: "600" },
+  error: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: spacing.sm,
+  },
   startButton: {
-    backgroundColor: "#0a84ff",
+    backgroundColor: colors.primary,
     paddingVertical: 16,
-    borderRadius: 10,
+    borderRadius: radii.md,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: spacing.sm,
   },
-  startButtonText: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  startButtonText: {
+    ...typography.buttonLabel,
+    color: colors.textInverse,
+    fontSize: 17,
+  },
 });

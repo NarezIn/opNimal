@@ -292,3 +292,56 @@ describe("Game state machine (applyMove + appUserWon)", () => {
     expect(appUserWon(state)).toBe(true);
   });
 });
+
+describe("First-turn range — no special restriction on move 1", () => {
+  /**
+   * Lock in: on a fresh game (history empty, currentTotal === 0) the legal
+   * move range is the full [min, max] for whichever side moves first. There
+   * is no code path that restricts the first move to 1 or to any other
+   * single value.
+   */
+
+  test("applyMove accepts every value in [min, max] on a fresh state (min=1)", () => {
+    const config: GameConfig = {
+      target: 10,
+      hittingTargetMeans: "LOSE",
+      min: 1,
+      max: 3,
+      startingPlayer: "APP_USER",
+    };
+    for (const k of [1, 2, 3]) {
+      const state = createInitialGameState(config);
+      expect(state.history.length).toBe(0);
+      expect(state.currentTotal).toBe(0);
+      expect(() => applyMove(state, k)).not.toThrow();
+    }
+  });
+
+  test("applyMove accepts every value in [min, max] on a fresh state (min > 1)", () => {
+    const config: GameConfig = {
+      target: 20,
+      hittingTargetMeans: "WIN",
+      min: 2,
+      max: 5,
+      startingPlayer: "OPPONENT",
+    };
+    for (const k of [2, 3, 4, 5]) {
+      const state = createInitialGameState(config);
+      expect(() => applyMove(state, k)).not.toThrow();
+    }
+    // Out-of-range values still throw, even on turn one.
+    expect(() => applyMove(createInitialGameState(config), 1)).toThrow();
+    expect(() => applyMove(createInitialGameState(config), 6)).toThrow();
+  });
+
+  test("suggestMove on turn one returns a value within [min, max]", () => {
+    // For LOSE variant the canonical first move is 1; for WIN variant it is
+    // 2 (forcing opp into d=8). Together these show suggestMove is not
+    // hardcoded to a single value on the first turn.
+    const loseLosing = computeLosingPositions(10, 1, 3, "LOSE");
+    expect(suggestMove(10, 1, 3, loseLosing, "LOSE")).toBe(1);
+
+    const winLosing = computeLosingPositions(10, 1, 3, "WIN");
+    expect(suggestMove(10, 1, 3, winLosing, "WIN")).toBe(2);
+  });
+});
